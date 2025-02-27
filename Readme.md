@@ -1,6 +1,9 @@
 # Pipeline Oracle
 
-**Pipeline Oracle** is a cutting-edge CI/CD failure analysis tool that leverages the power of AI (via OpenAI's GPT-4 Turbo) to provide clear, actionable insights for fixing pipeline issues. Integrated directly with GitHub Actions, Pipeline Oracle automatically fetches logs from failed workflows, analyzes them, and generates detailed reports to help your team quickly diagnose and resolve issues. 🚀🔧
+**Pipeline Oracle** is a cutting-edge CI/CD failure analysis tool that leverages the power of AI (via OpenAI's GPT-4
+Turbo) to provide clear, actionable insights for fixing pipeline issues. Integrated directly with GitHub Actions,
+Pipeline Oracle automatically fetches logs from failed workflows, analyzes them, and generates detailed reports to help
+your team quickly diagnose and resolve issues. 🚀🔧
 
 ---
 
@@ -34,7 +37,11 @@
    The logs are sent to OpenAI's GPT-4 Turbo for analysis, generating a detailed report with actionable fixes.
 
 4. **Artifact Upload:** 📤  
-   The report and logs are uploaded as artifacts, so you can download and review them directly from the GitHub Actions run summary.
+   The report and logs are uploaded as artifacts, so you can download and review them directly from the GitHub Actions
+   run summary.
+
+5. **Github Issue Creation:** 📝
+   The report is used to create a Github issue with the analysis report.
 
 ---
 
@@ -63,12 +70,12 @@
 
 ## Usage
 
-Pipeline Oracle runs automatically when a workflow fails, thanks to the On Failure Log Analysis workflow configured in your repository. ⚙️
+Pipeline Oracle runs automatically when a workflow fails, thanks to the On Failure Log Analysis workflow configured in
+your repository. ⚙️
 
 ### Running Locally
 
 You can also run the analysis locally. Make sure you have a log file at `logs/full_log.txt`, then run:
-
 
 This will:
 
@@ -76,11 +83,14 @@ This will:
 - Send the logs to OpenAI for analysis.
 - Generate an analysis_report.md with AI-generated insights.
 
-Contributions are welcome! Please fork this repository, create a new branch, and open a pull request with your changes. 🙌
+Contributions are welcome! Please fork this repository, create a new branch, and open a pull request with your changes.
+🙌
 
 ## License
+
 This project is licensed under the MIT License. See the [LICENSE](License.md) file for details.
 
 ## Acknowledgements
+
 - [OpenAI](https://openai.com) for providing the powerful GPT-4 Turbo model.
 - [GitHub](https://github.com) for enabling seamless CI/CD workflows with GitHub Actions.

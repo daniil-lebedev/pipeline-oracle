@@ -57,3 +57,14 @@ jobs:
             analysis_report.md
             logs/full_log.txt
           if-no-files-found: warn
+
+      - name: Create GitHub Issue with AI Analysis
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          title: "CI/CD Failure Analysis: ${{ github.run_id }}"
+          content-filepath: analysis_report.md
+          labels: |
+            ci-failure
+            analysis
+            assignees: ${{ github.actor }}
