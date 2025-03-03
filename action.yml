@@ -41,6 +41,8 @@ runs:
         gh run view "$RUN_ID" --log > logs/full_log.txt || { echo "[ERROR] Could not fetch logs"; exit 1; }
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
+      env:
+        GH_TOKEN: ${{ inputs.gh-pat }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -77,6 +79,10 @@ runs:
           analysis_report.md
           logs/full_log.txt
         if-no-files-found: warn
+
+    - name: Clean up logs directory
+      shell: bash
+      run: rm -rf logs
 
     - name: Create GitHub Issue with AI Analysis
       uses: peter-evans/create-issue-from-file@v4
