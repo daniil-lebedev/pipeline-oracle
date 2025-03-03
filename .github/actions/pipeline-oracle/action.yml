@@ -1,7 +1,12 @@
 name: "Pipeline Oracle Analysis"
 description: >
-  Analyzes the last failed workflow, runs AI analysis on logs, and creates a GitHub issue with the report. Users must supply their own GitHub PAT and GitHub API key.
+  Analyzes the last failed workflow, runs AI analysis on logs, and creates a GitHub issue with the report. 
+  Users must supply their own GitHub PAT and GitHub API key.
 author: "Daniil Lebedev daniilwork247@gmail.com"
+
+branding:
+  icon: "zap"
+  color: "blue"
 
 inputs:
   workflow-to-track:
@@ -25,7 +30,6 @@ runs:
       id: fetch_logs
       run: |
         echo "[INFO] Fetching last failed workflow..."
-        # Get the last failed workflow run ID that is not this workflow
         RUN_ID=$(gh run list --limit 5 --json databaseId,name,conclusion \
           --jq "[.[] | select(.conclusion == \"failure\" and .name != \"Pipeline Oracle Analysis\")][0].databaseId")
         if [ -z "$RUN_ID" ]; then
@@ -35,11 +39,11 @@ runs:
         echo "[INFO] Last failed workflow ID: $RUN_ID"
         mkdir -p logs
         echo "[INFO] Fetching logs for run $RUN_ID..."
-        gh run view "$RUN_ID" --log > logs/full_log.txt || { echo "[WARNING] Could not fetch logs"; }
+        gh run view "$RUN_ID" --log > logs/full_log.txt || { echo "[ERROR] Could not fetch logs"; exit 1; }
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
       env:
-        GH_TOKEN: ${{ inputs.gh-pat }}
+        OPENAI_API_KEY: ${{ inputs.github-api-key }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -53,13 +57,12 @@ runs:
         pip install -r requirements.txt
 
     - name: Run AI Analysis on Execution Logs
-      run: python pipeline-oracle.py
+      run: python pipeline-oracle.py || { echo "[ERROR] AI analysis failed"; exit 1; }
       env:
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     - name: Prepend commit message to analysis report
       run: |
-        # Get the commit message from the failed workflow's head commit
         COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
         echo "# Report Analysis: $COMMIT_MSG" > tmp_report.md
         echo "" >> tmp_report.md
