@@ -77,7 +77,7 @@ Pipeline Oracle is now available as a reusable composite GitHub Action that make
        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
        steps:
          - name: Run Pipeline Oracle Analysis
-           uses: daniil-lebedev/pipeline-oracle-action@v1.0.0
+           uses: daniil-lebedev/pipeline-oracle@v1.0.3
            with:
              workflow-to-track: "Deploying to Prod"
              gh-pat: ${{ secrets.GH_PAT }}
