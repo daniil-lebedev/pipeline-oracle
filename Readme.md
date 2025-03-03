@@ -56,7 +56,7 @@
 Pipeline Oracle is now available as a reusable composite GitHub Action that makes integration plug-and-play. Follow these steps:
 
 1. **Publish/Install the Action:**  
-   Pipeline Oracle is published on the GitHub Marketplace as [your-username/pipeline-oracle-action](#).  
+   Pipeline Oracle is published on the GitHub Marketplace as [daniil-lebedev/pipeline-oracle](https://github.com/daniil-lebedev/pipeline-oracle).  
    *(Replace with the actual link once published.)*
 
 2. **Configure Your Workflow:**  
@@ -77,7 +77,7 @@ Pipeline Oracle is now available as a reusable composite GitHub Action that make
        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
        steps:
          - name: Run Pipeline Oracle Analysis
-           uses: daniil-lebedev/pipeline-oracle@v1.0.3
+           uses: daniil-lebedev/pipeline-oracle@v1.0.4
            with:
              workflow-to-track: "Deploying to Prod"
              gh-pat: ${{ secrets.GH_PAT }}
