@@ -77,14 +77,12 @@ Pipeline Oracle is now available as a reusable composite GitHub Action that make
        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
        steps:
          - name: Run Pipeline Oracle Analysis
-           uses: your-username/pipeline-oracle-action@v1.0.0
+           uses: daniil-lebedev/pipeline-oracle-action@v1.0.0
            with:
              workflow-to-track: "Deploying to Prod"
              gh-pat: ${{ secrets.GH_PAT }}
              github-api-key: ${{ secrets.GITHUB_API_KEY }}
    ```
-
-   *Replace `your-username/pipeline-oracle-action@v1.0.0` with the correct repository path and version.*
 
 3. **Configure Secrets:**  
    In your repository settings, add the following secrets:
