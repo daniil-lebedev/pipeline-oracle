@@ -46,8 +46,6 @@
 - A GitHub repository with workflows using GitHub Actions.
 - An **OpenAI API key** (set as the repository secret `OPENAI_API_KEY`). 🔑
 - A **GitHub Personal Access Token (PAT)** with the required permissions (set as the repository secret `GH_PAT`). 🔒
-- A **GitHub API key** (set as the repository secret `GITHUB_API_KEY`).  
-  *Note: The GitHub API key is now required for advanced operations.*
 
 ---
 
@@ -77,18 +75,17 @@ Pipeline Oracle is now available as a reusable composite GitHub Action that make
        if: ${{ github.event.workflow_run.conclusion == 'failure' }}
        steps:
          - name: Run Pipeline Oracle Analysis
-           uses: daniil-lebedev/pipeline-oracle@v1.0.4
+           uses: daniil-lebedev/pipeline-oracle@v1.0.46
            with:
              workflow-to-track: "Deploying to Prod"
              gh-pat: ${{ secrets.GH_PAT }}
-             github-api-key: ${{ secrets.GITHUB_API_KEY }}
+             openai-api-key: ${{ secrets.OPENAI_API_KEY }}
    ```
 
 3. **Configure Secrets:**  
    In your repository settings, add the following secrets:
    - **OPENAI_API_KEY:** Your OpenAI API key.
-   - **GH_PAT:** Your GitHub PAT.
-   - **GITHUB_API_KEY:** Your GitHub API key.
+   - **GH_PAT:** Your GitHub Personal Access Token.
 
 ---
 
@@ -123,3 +120,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 - [OpenAI](https://openai.com) for providing the powerful GPT-4 Turbo model.
 - [GitHub](https://github.com) for enabling seamless CI/CD workflows with GitHub Actions.
+
+---
+
+By packaging Pipeline Oracle as a composite GitHub Action, new projects can integrate it by simply adding one minimal workflow file and configuring their own credentials via repository secrets. This plug-and-play approach keeps your CI/CD failure analysis powerful yet easy to adopt.
