@@ -1,87 +1,70 @@
-name: "Pipeline Oracle Analysis"
-description: >
-  Analyzes the last failed workflow, runs AI analysis on logs, and creates a GitHub issue with the report. Users must supply their own GitHub PAT and GitHub API key.
-author: "Daniil Lebedev daniilwork247@gmail.com"
+name: Pipeline Oracle
 
-inputs:
-  workflow-to-track:
-    description: "Name of the workflow to track (e.g., 'Deploying to Prod')."
-    required: false
-    default: "Deploying to Prod"
-  gh-pat:
-    description: "GitHub Personal Access Token (PAT) to be used for GH CLI commands."
-    required: true
-  github-api-key:
-    description: "GitHub API key required for advanced GitHub API operations."
-    required: true
+on:
+  workflow_run:
+    workflows: [ "CI Pipeline" ]  # Track this specific workflow
+    types:
+      - completed
 
-runs:
-  using: "composite"
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+jobs:
+  failure-analysis:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}  # Only run if the tracked workflow failed
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    - name: Fetch logs from last failed workflow
-      id: fetch_logs
-      run: |
-        echo "[INFO] Fetching last failed workflow..."
-        # Get the last failed workflow run ID that is not this workflow
-        RUN_ID=$(gh run list --limit 5 --json databaseId,name,conclusion \
-          --jq "[.[] | select(.conclusion == \"failure\" and .name != \"Pipeline Oracle Analysis\")][0].databaseId")
-        if [ -z "$RUN_ID" ]; then
-          echo "[ERROR] No failed workflows found. Exiting." >&2
-          exit 1
-        fi
-        echo "[INFO] Last failed workflow ID: $RUN_ID"
-        mkdir -p logs
-        echo "[INFO] Fetching logs for run $RUN_ID..."
-        gh run view "$RUN_ID" --log > logs/full_log.txt || { echo "[WARNING] Could not fetch logs"; }
-        echo "[INFO] Log file (first 20 lines):"
-        head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
-      env:
-        GH_TOKEN: ${{ inputs.gh-pat }}
+      - name: Fetch logs from last failed workflow
+        run: |
+          echo "[INFO] Fetching last failed workflow..."
+          # Get the last failed workflow run ID that is not this workflow
+          RUN_ID=$(gh run list --limit 5 --json databaseId,name,conclusion \
+            --jq '[.[] | select(.conclusion == "failure" and .name != "On Failure Log Analysis")][0].databaseId')
+          if [ -z "$RUN_ID" ]; then
+            echo "[ERROR] No failed workflows found. Exiting." >&2
+            exit 1
+          fi
+          echo "[INFO] Last failed workflow ID: $RUN_ID"
+          mkdir -p logs
+          echo "[INFO] Fetching logs for run $RUN_ID..."
+          gh run view "$RUN_ID" --log > logs/full_log.txt || echo "[WARNING] Could not fetch logs"
+          echo "[INFO] Log file (first 20 lines):"
+          head -20 logs/full_log.txt || echo "[WARNING] Log file is empty"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
 
-    - name: Set up Python and install dependencies
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-        cache: 'pip'
+      - name: Set up Python and install dependencies
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
 
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Run AI Analysis on Execution Logs
-      run: python pipeline-oracle.py
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: Run AI Analysis on Execution Logs
+        run: python analyze_execution.py
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-    - name: Prepend commit message to analysis report
-      run: |
-        # Get the commit message from the failed workflow's head commit
-        COMMIT_MSG="${{ github.event.workflow_run.head_commit.message }}"
-        echo "# Report Analysis: $COMMIT_MSG" > tmp_report.md
-        echo "" >> tmp_report.md
-        cat analysis_report.md >> tmp_report.md
-        mv tmp_report.md analysis_report.md
+      - name: Upload analysis report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-analysis-report
+          path: |
+            analysis_report.md
+            logs/full_log.txt
+          if-no-files-found: warn
 
-    - name: Upload analysis report as artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: failure-analysis-report
-        path: |
-          analysis_report.md
-          logs/full_log.txt
-        if-no-files-found: warn
-
-    - name: Create GitHub Issue with AI Analysis
-      uses: peter-evans/create-issue-from-file@v4
-      with:
-        token: ${{ inputs.gh-pat }}
-        title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
-        content-filepath: analysis_report.md
-        assignees: ${{ github.event.workflow_run.actor.login }}
-        labels: |
-          ci-failure
-          analysis
+      - name: Create GitHub Issue with AI Analysis
+        uses: peter-evans/create-issue-from-file@v5
+        with:
+          token: ${{ secrets.GH_PAT }}
+          title: "CI/CD Failure Analysis: ${{ github.run_id }}"
+          content-filepath: analysis_report.md
+          labels: |
+            ci-failure
+            analysis
+            assignees: ${{ github.actor }}

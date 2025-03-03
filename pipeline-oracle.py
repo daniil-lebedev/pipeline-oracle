@@ -1,16 +1,16 @@
-import asyncio
-import logging
 import os
 import sys
+import logging
+import asyncio
 from pathlib import Path
-
 from dotenv import load_dotenv
+
 from openai import AsyncOpenAI
 
-# Configure logging
+# Configure logging for better output
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 # Ensure OpenAI API key is set
@@ -19,7 +19,7 @@ if not api_key:
     logging.error("OpenAI API key not found. Please set it in the environment variable 'OPENAI_API_KEY'.")
     sys.exit(1)
 
-# Initialize the AsyncOpenAI client
+# Initialize AsyncOpenAI client with the API key
 client = AsyncOpenAI(api_key=api_key)
 
 # Define log file directory
@@ -28,87 +28,69 @@ LOG_DIR = Path("logs")
 
 def find_log_file() -> Path:
     """
-    Dynamically find the first .txt log file in LOG_DIR.
-    Exits if directory or log file is not found.
+    Dynamically find the first .txt log file in the LOG_DIR.
+    Exits if the directory does not exist or no log file is found.
     """
     if not LOG_DIR.exists():
-        logging.error("Logs directory does not exist. Exiting.")
+        logging.error("Logs directory does not exist. Skipping analysis.")
         sys.exit(1)
+
     log_files = list(LOG_DIR.glob("**/*.txt"))
     if not log_files:
-        logging.error("No log files found in logs. Exiting.")
+        logging.error("No log files found in logs/. Skipping analysis.")
         sys.exit(1)
+
     logging.info(f"Found log file at: {log_files[0].resolve()}")
     return log_files[0]
 
 
 def read_log_file(log_file: Path) -> str:
     """
-    Reads and returns the content of the given log file.
+    Reads and returns the content of the provided log file.
     Exits if the file is not found or is empty.
     """
     if not log_file.exists():
         logging.error(f"Log file not found: {log_file}")
         sys.exit(1)
+
     logs = log_file.read_text(encoding="utf-8").strip()
     if not logs:
-        logging.error("Log file is empty. Exiting.")
+        logging.error("Log file is empty. Skipping analysis.")
         sys.exit(1)
     return logs
 
 
-def extract_error_snippet(logs: str) -> str:
-    """
-    Extracts an error snippet from the logs.
-    Searches for a line containing "Traceback" or 'File "'
-    and returns 3 lines before and 3 lines after that line.
-    """
-    lines = logs.splitlines()
-    for i, line in enumerate(lines):
-        if "Traceback" in line or 'File "' in line:
-            start = max(0, i - 3)
-            end = min(len(lines), i + 4)
-            snippet = "\n".join(lines[start:end])
-            logging.info("Error snippet extracted.")
-            return snippet
-    logging.info("No error snippet found in logs.")
-    return ""
-
-
 async def analyze_logs_with_ai(logs: str) -> str:
     """
-    Sends the logs along with an extracted error snippet to OpenAI for analysis.
-    The prompt instructs the AI to provide a detailed analysis, a proposed fix,
-    and a diagram (in Mermaid syntax) illustrating how the error might have occurred.
+    Asynchronously sends the provided logs to OpenAI for analysis using AsyncOpenAI
+    and returns the AI-generated response.
     """
-    error_snippet = extract_error_snippet(logs)
-    prompt = (
-        "Analyze the following logs from a GitHub Actions workflow failure and provide a detailed analysis, "
-        "a proposed fix, and a diagram (in Mermaid syntax) illustrating how the error might have occurred.\n\n"
-        "Full Logs:\n"
-        f"{logs}\n\n"
-        "Error Snippet (if any):\n"
-        f"{error_snippet}\n\n"
-        "Please format your response in Markdown with separate sections for **Analysis**, **Proposed Fix**, and **Diagram**."
-    )
     try:
-        logging.info("Sending logs and error snippet to OpenAI for analysis...")
+        logging.info("Sending logs to OpenAI for analysis...")
         response = await client.chat.completions.create(
             model="gpt-4-turbo",
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a DevOps and software engineering expert. Provide clear, actionable advice."
+                    "content": (
+                        "You are an AI assistant analyzing CI/CD pipeline logs. "
+                        "Provide clear, actionable advice on how to fix any failures."
+                    )
                 },
                 {
                     "role": "user",
-                    "content": prompt
+                    "content": (
+                        f"Analyze the following logs from a GitHub Actions workflow and "
+                        f"suggest specific fixes for any failures:\n\n{logs}"
+                    )
                 }
             ],
             timeout=60
         )
         logging.info("AI analysis complete.")
         logging.debug(f"Full AI response: {response}")
+
+        # Use attribute access instead of .get()
         if response.choices and response.choices[0].message and response.choices[0].message.content:
             return response.choices[0].message.content
         else:
@@ -119,18 +101,19 @@ async def analyze_logs_with_ai(logs: str) -> str:
         return ""
 
 
-async def main() -> None:
+async def main():
     """
-    Main async function to run the analysis and save the report.
+    Main async function to analyze logs and output AI-generated insights.
     """
     log_file = find_log_file()
     logs = read_log_file(log_file)
     analysis = await analyze_logs_with_ai(logs)
+
     if analysis:
         logging.info("\n=== AI Analysis Report ===\n")
         logging.info(analysis)
         report_path = Path("analysis_report.md")
-        report_path.write_text(analysis, encoding="utf-8")
+        report_path.write_text(f"# CI/CD Pipeline Failure Analysis\n\n{analysis}", encoding="utf-8")
         logging.info(f"Analysis report saved to '{report_path.resolve()}'")
     else:
         logging.error("No analysis report generated.")
