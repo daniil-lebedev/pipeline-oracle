@@ -1,7 +1,5 @@
 name: "Pipeline Oracle Analysis"
-description: >
-  Analyzes the last failed workflow, runs AI analysis on logs, and creates a GitHub issue with the report. 
-  Users must supply their own GitHub PAT and GitHub API key.
+description: "Analyzes failed workflows, runs AI analysis on logs, and creates a GitHub issue with the report."
 author: "Daniil Lebedev daniilwork247@gmail.com"
 
 branding:
@@ -43,7 +41,7 @@ runs:
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
       env:
-        OPENAI_API_KEY: ${{ inputs.github-api-key }}
+        GITHUB_API_KEY: ${{ inputs.github-api-key }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -59,7 +57,7 @@ runs:
     - name: Run AI Analysis on Execution Logs
       run: python pipeline-oracle.py || { echo "[ERROR] AI analysis failed"; exit 1; }
       env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        GITHUB_API_KEY: ${{ inputs.github-api-key }}
 
     - name: Prepend commit message to analysis report
       run: |
