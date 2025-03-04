@@ -1,5 +1,5 @@
 name: "Pipeline Oracle Analysis"
-description: "Analyzes failed workflows, runs AI analysis on logs, and creates a CI/CD summary."
+description: "Analyzes failed workflows, runs AI analysis on logs, and creates a GitHub issue with the report."
 author: "Daniil Lebedev daniilwork247@gmail.com"
 
 branding:
@@ -13,6 +13,9 @@ inputs:
     default: "Deploying to Prod"
   openai-api-key:
     description: "OpenAI API key for AI analysis."
+    required: true
+  create-github-issue:
+    description: "Flag to create or not create a GitHub issue from the report. Y or N."
     required: true
 
 runs:
@@ -70,10 +73,10 @@ runs:
         cat analysis_report.md >> tmp_report.md
         mv tmp_report.md analysis_report.md
 
-    - name: Upload CI/CD Summary as Artifact
+    - name: Upload analysis report as artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ci-cd-summary
+        name: failure-analysis-report
         path: |
           analysis_report.md
           logs/full_log.txt
@@ -82,3 +85,19 @@ runs:
     - name: Clean up logs directory
       shell: bash
       run: rm -rf logs
+
+    - name: Create a GitHub Actions Summary using Report
+      shell: bash
+      run: cat analysis_report.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Create GitHub Issue with AI Analysis
+      if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
+      uses: peter-evans/create-issue-from-file@v4
+      with:
+        token: ${{ inputs.gh-pat }}
+        title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
+        content-filepath: analysis_report.md
+        assignees: ${{ github.event.workflow_run.actor.login }}
+        labels: |
+          ci-failure
+          analysis
