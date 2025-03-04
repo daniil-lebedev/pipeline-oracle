@@ -1,7 +1,3 @@
-Below is an updated README for **Pipeline Oracle v1.1.0** that reflects the latest changes—using a GitHub PAT for authentication, generating a comprehensive CI/CD summary, and optionally creating a GitHub issue from the report.
-
----
-
 # Pipeline Oracle 🚀
 
 **Pipeline Oracle** is a cutting-edge CI/CD failure analysis tool that leverages the power of AI (via OpenAI's GPT-4 Turbo) to provide clear, actionable insights for fixing pipeline issues. Integrated with GitHub Actions, Pipeline Oracle automatically fetches logs from failed workflows, analyzes them, and generates detailed reports to help your team quickly diagnose and resolve issues. 🔧🤖
