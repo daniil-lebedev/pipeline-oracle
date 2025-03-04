@@ -11,11 +11,11 @@ inputs:
     description: "Name of the workflow to track (e.g., 'Deploying to Prod')."
     required: false
     default: "Deploying to Prod"
-  gh-pat:
-    description: "GitHub Personal Access Token (PAT) to be used for GH CLI commands."
-    required: true
   openai-api-key:
     description: "OpenAI API key for AI analysis."
+    required: true
+  create-github-issue:
+    description: "Flag to create or not create a GitHub issue from the report. Y or N."
     required: true
 
 runs:
@@ -24,7 +24,7 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ inputs.gh-pat }}
+        token: ${{ github.token }}
 
     - name: Fetch logs from last failed workflow
       id: fetch_logs
@@ -44,7 +44,7 @@ runs:
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
       env:
-        GH_TOKEN: ${{ inputs.gh-pat }}
+        GH_TOKEN: ${{ github.token }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -86,7 +86,12 @@ runs:
       shell: bash
       run: rm -rf logs
 
+    - name: Create a GitHub Actions Summary using Report
+      shell: bash
+      run: cat analysis_report.md >> $GITHUB_STEP_SUMMARY
+
     - name: Create GitHub Issue with AI Analysis
+      if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
       uses: peter-evans/create-issue-from-file@v4
       with:
         token: ${{ inputs.gh-pat }}
