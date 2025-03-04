@@ -11,9 +11,6 @@ inputs:
     description: "Name of the workflow to track (e.g., 'Deploying to Prod')."
     required: false
     default: "Deploying to Prod"
-  gh-pat:
-    description: "GitHub Personal Access Token (PAT) to be used for GH CLI commands."
-    required: true
   openai-api-key:
     description: "OpenAI API key for AI analysis."
     required: true
@@ -27,7 +24,7 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        token: ${{ inputs.gh-pat }}
+        token: ${{ github.token }}
 
     - name: Fetch logs from last failed workflow
       id: fetch_logs
@@ -47,7 +44,7 @@ runs:
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
       env:
-        GH_TOKEN: ${{ inputs.gh-pat }}
+        GH_TOKEN: ${{ github.token }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -97,7 +94,7 @@ runs:
       if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
       uses: peter-evans/create-issue-from-file@v4
       with:
-        token: ${{ inputs.gh-pat }}
+        token: ${{ github.token }}
         title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
         content-filepath: analysis_report.md
         assignees: ${{ github.event.workflow_run.actor.login }}
