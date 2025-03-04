@@ -1,5 +1,5 @@
 name: "Pipeline Oracle Analysis"
-description: "Analyzes failed workflows, runs AI analysis on logs, and creates a GitHub issue with the report."
+description: "Analyzes failed workflows, runs AI analysis on logs, and creates a CI/CD summary."
 author: "Daniil Lebedev daniilwork247@gmail.com"
 
 branding:
@@ -11,9 +11,6 @@ inputs:
     description: "Name of the workflow to track (e.g., 'Deploying to Prod')."
     required: false
     default: "Deploying to Prod"
-  gh-pat:
-    description: "GitHub Personal Access Token (PAT) to be used for GH CLI commands."
-    required: true
   openai-api-key:
     description: "OpenAI API key for AI analysis."
     required: true
@@ -23,8 +20,6 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        token: ${{ inputs.gh-pat }}
 
     - name: Fetch logs from last failed workflow
       id: fetch_logs
@@ -44,7 +39,7 @@ runs:
         echo "[INFO] Log file (first 20 lines):"
         head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
       env:
-        GH_TOKEN: ${{ inputs.gh-pat }}
+        GH_TOKEN: ${{ github.token }}
 
     - name: Set up Python and install dependencies
       uses: actions/setup-python@v4
@@ -73,10 +68,10 @@ runs:
         cat analysis_report.md >> tmp_report.md
         mv tmp_report.md analysis_report.md
 
-    - name: Upload analysis report as artifact
+    - name: Upload CI/CD Summary as Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: failure-analysis-report
+        name: ci-cd-summary
         path: |
           analysis_report.md
           logs/full_log.txt
@@ -85,14 +80,3 @@ runs:
     - name: Clean up logs directory
       shell: bash
       run: rm -rf logs
-
-    - name: Create GitHub Issue with AI Analysis
-      uses: peter-evans/create-issue-from-file@v4
-      with:
-        token: ${{ inputs.gh-pat }}
-        title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
-        content-filepath: analysis_report.md
-        assignees: ${{ github.event.workflow_run.actor.login }}
-        labels: |
-          ci-failure
-          analysis
