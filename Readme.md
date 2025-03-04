@@ -48,8 +48,6 @@
 
 - A GitHub repository with workflows using GitHub Actions.
 - An **OpenAI API key** (set as the repository secret `OPENAI_API_KEY`). 🔑
-- A **GitHub Personal Access Token (PAT)** with the required permissions (set as the repository secret `GH_PAT`). 🔒  
-  *Make sure the PAT has sufficient scopes (for example, `repo` and `workflow` scopes) and that your workflow permissions include `issues: write` if you want to create issues.*
 
 ---
 
@@ -57,9 +55,8 @@
 
 Pipeline Oracle is available as a reusable composite GitHub Action. Follow these steps to integrate it:
 
-1. **Publish/Install the Action:**  
-   Pipeline Oracle is published on the GitHub Marketplace as [daniil-lebedev/pipeline-oracle](https://github.com/daniil-lebedev/pipeline-oracle).  
-   *(Replace with the actual link once published.)*
+1. **Install the Action:**  
+   Pipeline Oracle is published on the GitHub Marketplace as [daniil-lebedev/pipeline-oracle](https://github.com/daniil-lebedev/pipeline-oracle).
 
 2. **Configure Your Workflow:**  
    Create a workflow file (e.g., `.github/workflows/on-failure.yaml`) in your repository with the following content:
@@ -74,6 +71,7 @@ Pipeline Oracle is available as a reusable composite GitHub Action. Follow these
 
    on:
      workflow_run:
+       # define what pipelines need to run before Pipeline Oracle is triggered
        workflows: [ "Deploying to Prod", "Integration Tests", "Build Pipeline" ]
        types:
          - completed
@@ -86,6 +84,7 @@ Pipeline Oracle is available as a reusable composite GitHub Action. Follow these
          - name: Run Pipeline Oracle Analysis
            uses: daniil-lebedev/pipeline-oracle@v1.1.0
            with:
+             # define which workflows should be tracked
              workflow-to-track: "Deploying to Prod"
              gh-pat: ${{ secrets.GH_PAT }}
              openai-api-key: ${{ secrets.OPENAI_API_KEY }}
@@ -95,8 +94,6 @@ Pipeline Oracle is available as a reusable composite GitHub Action. Follow these
 3. **Configure Secrets:**  
    In your repository settings, add the following secrets:
    - **OPENAI_API_KEY:** Your OpenAI API key.
-   - **GH_PAT:** Your GitHub Personal Access Token.
-
 ---
 
 ## Running Pipeline Oracle Locally 💻
