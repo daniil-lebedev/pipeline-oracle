@@ -17,6 +17,9 @@ inputs:
   openai-api-key:
     description: "OpenAI API key for AI analysis."
     required: true
+  create-github-issue:
+    description: "Flag to create or not create a GitHub issue from the report. Y or N."
+    required: true
 
 runs:
   using: "composite"
@@ -86,7 +89,12 @@ runs:
       shell: bash
       run: rm -rf logs
 
+    - name: Create a GitHub Actions Summary using Report
+      shell: bash
+      run: cat analysis_report.md >> $GITHUB_STEP_SUMMARY
+
     - name: Create GitHub Issue with AI Analysis
+      if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
       uses: peter-evans/create-issue-from-file@v4
       with:
         token: ${{ inputs.gh-pat }}
