@@ -94,7 +94,7 @@ runs:
       if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
       uses: peter-evans/create-issue-from-file@v4
       with:
-        token: ${{ inputs.gh-pat }}
+        token: ${{ github.token }}
         title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
         content-filepath: analysis_report.md
         assignees: ${{ github.event.workflow_run.actor.login }}
