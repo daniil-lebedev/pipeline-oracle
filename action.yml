@@ -20,6 +20,8 @@ runs:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ github.token }}
 
     - name: Fetch logs from last failed workflow
       id: fetch_logs
