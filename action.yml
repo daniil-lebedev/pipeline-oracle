@@ -1,10 +1,11 @@
 name: "Pipeline Oracle Analysis"
-description: "Analyzes failed workflows, runs AI analysis on logs, and creates a GitHub issue with the report."
+description: "Analyzes failed jobs and steps, runs AI analysis, and optionally creates a GitHub issue with the report."
 author: "Daniil Lebedev daniilwork247@gmail.com"
 
 branding:
   icon: "zap"
   color: "blue"
+  description: "Efficient way to fix pipelines in shortest time possible."
 
 inputs:
   workflow-to-track:
@@ -15,12 +16,41 @@ inputs:
     description: "OpenAI API key for AI analysis."
     required: true
   create-github-issue:
-    description: "Flag to create or not create a GitHub issue from the report. Y or N."
-    required: true
+    description: "Flag to create a GitHub issue from the report. Y or N."
+    required: false
+    default: "N"
+  python-version:
+    description: "Python version to use for analysis."
+    required: false
+    default: "3.10"
+  max-log-lines:
+    description: "Maximum number of log lines to analyze."
+    required: false
+    default: "200"
+  max-log-size:
+    description: "Maximum characters to send to AI."
+    required: false
+    default: "10000"
+  ai-model:
+    description: "AI model to use for analysis."
+    required: false
+    default: "gpt-4-turbo"
+  ai-base-url:
+    description: "Base URL for AI API (optional)."
+    required: false
+    default: "https://api.openai.com/v1"
 
 runs:
   using: "composite"
   steps:
+    - name: Cache GitHub CLI
+      uses: actions/cache@v4
+      with:
+        path: /usr/local/bin/gh
+        key: ${{ runner.os }}-gh-cli-v2
+        restore-keys: |
+          ${{ runner.os }}-gh-cli-
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -31,38 +61,61 @@ runs:
       shell: bash
       run: |
         echo "[INFO] Fetching last failed workflow..."
-        RUN_ID=$(gh run list --limit 5 --json databaseId,name,conclusion \
+        RUN_ID=$(gh run list \
+          --workflow "${{ inputs.workflow-to-track }}" \
+          --limit 5 \
+          --json databaseId,name,conclusion \
           --jq "[.[] | select(.conclusion == \"failure\" and .name != \"Pipeline Oracle Analysis\")][0].databaseId")
+        
         if [ -z "$RUN_ID" ]; then
           echo "[ERROR] No failed workflows found. Exiting." >&2
           exit 1
         fi
+        
         echo "[INFO] Last failed workflow ID: $RUN_ID"
         mkdir -p logs
-        echo "[INFO] Fetching logs for run $RUN_ID..."
-        gh run view "$RUN_ID" --log > logs/full_log.txt || { echo "[ERROR] Could not fetch logs"; exit 1; }
-        echo "[INFO] Log file (first 20 lines):"
-        head -20 logs/full_log.txt || { echo "[WARNING] Log file is empty"; }
+
+        echo "[INFO] Fetching jobs for workflow run..."
+        JOB_IDS=$(gh run view "$RUN_ID" --json jobs --jq '.jobs | map(select(.conclusion == "failure")) | .[].databaseId')
+        
+        if [ -z "$JOB_IDS" ]; then
+          echo "[ERROR] No failed jobs found in this workflow."
+          exit 1
+        fi
+
+        echo "[INFO] Fetching logs for failed jobs..."
+        echo "$JOB_IDS" | xargs -P 4 -I {} bash -c '
+          gh run view "{}" --log > "logs/job_{}.txt"
+          FAILED_STEPS=$(gh run view "{}" --json steps --jq ".steps | map(select(.conclusion == \"failure\")) | .[].name")
+          echo "Failed steps for job {}: $FAILED_STEPS"
+        '
+
       env:
         GH_TOKEN: ${{ github.token }}
 
     - name: Set up Python and install dependencies
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: ${{ inputs.python-version }}
         cache: 'pip'
 
     - name: Install Python dependencies
       shell: bash
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements.txt --no-cache-dir
 
-    - name: Run AI Analysis on Execution Logs
+    - name: Run AI Analysis on Failed Steps
       shell: bash
-      run: python pipeline-oracle.py || { echo "[ERROR] AI analysis failed"; exit 1; }
+      run: |
+        echo "[INFO] Running AI Analysis..."
+        python pipeline-oracle.py || { echo "[ERROR] AI analysis failed"; exit 1; }
       env:
         OPENAI_API_KEY: ${{ inputs.openai-api-key }}
+        OPENAI_MODEL: ${{ inputs.ai-model }}
+        OPENAI_BASE_URL: ${{ inputs.ai-base-url }}
+        MAX_LOG_LINES: ${{ inputs.max-log-lines }}
+        MAX_LOG_SIZE: ${{ inputs.max-log-size }}
 
     - name: Prepend commit message to analysis report
       shell: bash
@@ -73,13 +126,24 @@ runs:
         cat analysis_report.md >> tmp_report.md
         mv tmp_report.md analysis_report.md
 
-    - name: Upload analysis report as artifact
+    - name: Create GitHub Issue with Analysis Report
+      if: ${{ inputs.create-github-issue == 'Y' }}
+      shell: bash
+      run: |
+        gh issue create \
+          --title "Pipeline Failure Analysis - ${{ github.run_id }}" \
+          --body-file analysis_report.md
+      env:
+        GH_TOKEN: ${{ github.token }}
+
+    - name: Compress and Upload Analysis Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: failure-analysis-report
         path: |
           analysis_report.md
-          logs/full_log.txt
+          logs/*.txt
+        compression-level: 9
         if-no-files-found: warn
 
     - name: Clean up logs directory
@@ -89,15 +153,3 @@ runs:
     - name: Create a GitHub Actions Summary using Report
       shell: bash
       run: cat analysis_report.md >> $GITHUB_STEP_SUMMARY
-
-    - name: Create GitHub Issue with AI Analysis
-      if: ${{ inputs.create-github-issue == 'Y' || inputs.create-github-issue == 'y' }}
-      uses: peter-evans/create-issue-from-file@v4
-      with:
-        token: ${{ github.token }}
-        title: "Pipeline Oracle Report: ${{ github.event.workflow_run.head_commit.message }}"
-        content-filepath: analysis_report.md
-        assignees: ${{ github.event.workflow_run.actor.login }}
-        labels: |
-          ci-failure
-          analysis
