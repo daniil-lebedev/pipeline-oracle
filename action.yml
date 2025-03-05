@@ -5,7 +5,6 @@ author: "Daniil Lebedev daniilwork247@gmail.com"
 branding:
   icon: "zap"
   color: "blue"
-  description: "Efficient way to fix pipelines in shortest time possible."
 
 inputs:
   workflow-to-track:
@@ -50,6 +49,8 @@ runs:
         key: ${{ runner.os }}-gh-cli-v2
         restore-keys: |
           ${{ runner.os }}-gh-cli-
+      env:
+        GH_TOKEN: ${{ github.token }}
 
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -61,14 +62,17 @@ runs:
       shell: bash
       run: |
         echo "[INFO] Fetching last failed workflow..."
-        RUN_ID=$(gh run list \
-          --workflow "${{ inputs.workflow-to-track }}" \
-          --limit 5 \
-          --json databaseId,name,conclusion \
-          --jq "[.[] | select(.conclusion == \"failure\" and .name != \"Pipeline Oracle Analysis\")][0].databaseId")
+        RUN_ID=""
+        for i in {1..3}; do
+          RUN_ID=$(gh run list \
+            --workflow "${{ inputs.workflow-to-track }}" \
+            --limit 5 \
+            --json databaseId,name,conclusion \
+            --jq "[.[] | select(.conclusion == \"failure\" and .name != \"Pipeline Oracle Analysis\")][0].databaseId") && break || sleep 10
+        done
         
         if [ -z "$RUN_ID" ]; then
-          echo "[ERROR] No failed workflows found. Exiting." >&2
+          echo "[ERROR] No failed workflows found. Exiting."
           exit 1
         fi
         
@@ -76,7 +80,7 @@ runs:
         mkdir -p logs
 
         echo "[INFO] Fetching jobs for workflow run..."
-        JOB_IDS=$(gh run view "$RUN_ID" --json jobs --jq '.jobs | map(select(.conclusion == "failure")) | .[].databaseId')
+        JOB_IDS=$(gh run view "$RUN_ID" --json jobs --jq '.jobs | map(select(.conclusion == "failure")) | .[].jobId')
         
         if [ -z "$JOB_IDS" ]; then
           echo "[ERROR] No failed jobs found in this workflow."
@@ -84,16 +88,16 @@ runs:
         fi
 
         echo "[INFO] Fetching logs for failed jobs..."
-        echo "$JOB_IDS" | xargs -P 4 -I {} bash -c '
-          gh run view "{}" --log > "logs/job_{}.txt"
-          FAILED_STEPS=$(gh run view "{}" --json steps --jq ".steps | map(select(.conclusion == \"failure\")) | .[].name")
-          echo "Failed steps for job {}: $FAILED_STEPS"
-        '
+        for JOB_ID in $JOB_IDS; do
+          gh run view "$JOB_ID" --log > "logs/job_${JOB_ID}.txt" || echo "[WARNING] Could not fetch logs for job $JOB_ID"
+          FAILED_STEPS=$(gh run view "$JOB_ID" --json steps --jq ".steps | map(select(.conclusion == \"failure\")) | .[].name")
+          echo "[INFO] Failed steps for job $JOB_ID: $FAILED_STEPS"
+        done
 
       env:
         GH_TOKEN: ${{ github.token }}
 
-    - name: Set up Python and install dependencies
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: ${{ inputs.python-version }}
@@ -104,6 +108,14 @@ runs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt --no-cache-dir
+
+    - name: Check if `pipeline-oracle.py` exists
+      shell: bash
+      run: |
+        if [[ ! -f pipeline-oracle.py ]]; then
+          echo "[ERROR] pipeline-oracle.py not found. Exiting."
+          exit 1
+        fi
 
     - name: Run AI Analysis on Failed Steps
       shell: bash
@@ -125,16 +137,6 @@ runs:
         echo "" >> tmp_report.md
         cat analysis_report.md >> tmp_report.md
         mv tmp_report.md analysis_report.md
-
-    - name: Create GitHub Issue with Analysis Report
-      if: ${{ inputs.create-github-issue == 'Y' }}
-      shell: bash
-      run: |
-        gh issue create \
-          --title "Pipeline Failure Analysis - ${{ github.run_id }}" \
-          --body-file analysis_report.md
-      env:
-        GH_TOKEN: ${{ github.token }}
 
     - name: Compress and Upload Analysis Artifacts
       uses: actions/upload-artifact@v4
