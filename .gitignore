@@ -10,13 +10,6 @@ env/
 .venv/
 pip-wheel-metadata/
 
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-*.egg
-*.manifest
-*.spec
 
 # Installer logs
 pip-log.txt
@@ -76,8 +69,3 @@ $RECYCLE.BIN/
 # Logs
 logs/
 *.log
-
-# Docker
-docker-compose.override.yml
-docker-compose.yml
-Dockerfile
